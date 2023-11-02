@@ -4,7 +4,7 @@
 
 (Add demo link here)
 
-https://github.com/defenseunicorns/interactive-ops-ui/assets/50058333/9f6daef2-15d9-4a41-81ab-70be7ed65699
+demo video placeholder....
 
 ## 🚀 Mission Need/Bussiness Need
 
