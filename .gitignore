@@ -1,0 +1,7 @@
+venv/
+tests/db/
+preload/*
+metadata/*
+.idea/
+__pycache__/
+db/
