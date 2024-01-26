@@ -34,12 +34,12 @@ def save_titles_to_csv(titles, csv_path):
     with open(csv_path, 'w', newline='', encoding='utf-8') as csv_file:
         writer = csv.writer(csv_file)
         # Write the titles to the CSV file
-        writer.writerow(["Title"])  # Header
-        writer.writerows([[title] for title in titles])
+        writer.writerow(['Category', "Description"])  # Header
+        writer.writerows([[title,title] for title in titles])
 
 if __name__ == "__main__":
-    pdf_path = "preload/Doug's Guide to the Galaxy.pdf"
-    csv_path = "metadata/dougs_guide_catergories.csv"
+    pdf_path = "preload/Doug_Guide_to_the_Galaxy.pdf"
+    csv_path = "metadata/dougs_guide_categories.csv"
     extracted_titles = extract_headers_from_pdf(pdf_path)
     save_titles_to_csv(extracted_titles, csv_path)
     print(f"Titles extracted and saved to {csv_path}")
