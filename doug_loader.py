@@ -1,8 +1,9 @@
 import csv
 import ipaddress
 import re
-import outlines.text.generate as generate
+
 import outlines.models as models
+import outlines.text.generate as generate
 
 model = None
 
@@ -49,6 +50,26 @@ def make_valid_collection_name(s):
 
 
 def load_doug_data(chroma_client, csv_location, doc_location):
+    doug_categories = load_csv_into_iterable_map(csv_location)
+
+    for idx, row in enumerate(doug_categories):
+        row_metadata = create_header_metadata(row)
+        row_description = row['Description']
+        store_text_with_header(chroma_client, row_description, row_metadata, str(idx))
+
+    categories_list = [d["Category"] for d in doug_categories]
+    sections = extract_sections(doc_location, categories_list)
+
+    for keyword, content_list in sections.items():
+        valid_keyword = make_valid_collection_name(keyword)
+        section_collection = chroma_client.get_or_create_collection(name=valid_keyword)
+        for i, content in enumerate(content_list):
+            section_collection.add(documents=[content], ids=str(i))
+
+
+def load_markdown_data(chroma_client, url):
+
+    #bdf
     doug_categories = load_csv_into_iterable_map(csv_location)
 
     for idx, row in enumerate(doug_categories):

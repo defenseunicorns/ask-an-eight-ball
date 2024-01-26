@@ -1,5 +1,5 @@
 chromadb~=0.4.15
-attrs==19.3.0
+attrs==23.2.0
 requests~=2.31.0
 python-dateutil~=2.8.2
 uvicorn~=0.24.0.post1
