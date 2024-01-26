@@ -1,9 +1,10 @@
 import chromadb
-from langchain.embeddings.sentence_transformer import SentenceTransformerEmbeddings
+from langchain.embeddings.sentence_transformer import \
+    SentenceTransformerEmbeddings
 from langchain.vectorstores import Chroma
 
 import ingest
-from doug_loader import load_doug_data, query_with_doug
+from doug_loader import load_markdown_data, query_with_doug
 
 
 class DocumentStore:
@@ -15,6 +16,11 @@ class DocumentStore:
         # For the sliding window
         self.chunk_size = 200
         self.overlap_size = 50
+
+        self.username = "devopsdojoconsortium"
+        self.repository = "dojoconsortium.org"
+        self.path_to_directory = "content/en/docs"
+        self.url = f"https://api.github.com/repos/{self.username}/{self.repository}/contents/{self.path_to_directory}"
 
         self.embedding_function = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
         self.chroma_db = Chroma(embedding_function=self.embedding_function, collection_name="default",
@@ -42,5 +48,10 @@ class DocumentStore:
     def load_pdf(self, path):
         self.ingestor.load_data(path)
 
+    # def load_doug_date(self):
+    #     load_doug_data(self.client, "metadata/dougs_guide_categories.csv", "preload/Doug_Guide_to_the_Galaxy.pdf")
+
+
+
     def load_doug_date(self):
-        load_doug_data(self.client, "metadata/dougs_guide_categories.csv", "preload/Doug_Guide_to_the_Galaxy.pdf")
+        load_markdown_data(self.client, self.url)

@@ -5,3 +5,4 @@ metadata/*
 .idea/
 __pycache__/
 db/
+.env

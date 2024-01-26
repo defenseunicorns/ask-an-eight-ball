@@ -1,9 +1,14 @@
 import csv
 import ipaddress
+import json
+import os
 import re
 
 import outlines.models as models
 import outlines.text.generate as generate
+import requests
+from langchain.text_splitter import (MarkdownHeaderTextSplitter,
+                                     RecursiveCharacterTextSplitter)
 
 model = None
 
@@ -69,27 +74,78 @@ def load_doug_data(chroma_client, csv_location, doc_location):
 
 def load_markdown_data(chroma_client, url):
 
+    history_raw_text = ""
+    token = os.environ.get("TOKEN")
+    headers = {'Authorization': f'token {token}'}
+
+    response = requests.get(url, timeout=5, headers=headers)
+
+
+    file_data = json.loads(response.text)
+
+    # Loop through the file_data to extract file URLs
+    for file_info in file_data:
+        if 'download_url' in file_info:
+            file_url = file_info['download_url']
+            file_name = file_info['name']
+            
+            # Check if the file has a .md or .markdown extension
+            if file_name.lower().endswith(('_index.md')):
+
+                # Make a GET request to fetch the file content
+                file_response = requests.get(file_url, timeout=5, headers=headers)
+
+                file_content = file_response.text
+                # Store the file content in the dictionary
+                #markdown_contents[file_name] = file_content
+                history_raw_text = history_raw_text + file_content
+
+    headers_to_split_on = [
+        ("#", "Header 1"),
+        ("##", "Header 2"),
+        ("###", "Header 3"),
+        ("####", "Header 4"),
+    ]
+
+    md_splitter = MarkdownHeaderTextSplitter(headers_to_split_on=headers_to_split_on)
+
+    data = md_splitter.split_text(history_raw_text)
+
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=150)
+    docs = text_splitter.split_documents(data)
+
+    doug_categories=[]
+    for idx, row in enumerate(docs):
+        if hasattr(row, 'page_content') and hasattr(row, 'metadata'):
+            metadata = row.metadata
+            print(f'{idx}  {row.metadata} {row.page_content} ')
+            
+            # row_description=row.metadata['Header 2']
+            # row_metadata = create_header_metadata(row)
+            # store_text_with_header(chroma_client, row_description, row_metadata, str(idx))
+            # valid_keyword = make_valid_collection_name(row_description)
+            # section_collection = chroma_client.get_or_create_collection(name=valid_keyword)
+            # section_collection.add(documents=[row.page_content], ids=str(idx))
+
+
     #bdf
-    doug_categories = load_csv_into_iterable_map(csv_location)
+    # doug_categories = load_csv_into_iterable_map(csv_location)
 
-    for idx, row in enumerate(doug_categories):
-        row_metadata = create_header_metadata(row)
-        row_description = row['Description']
-        store_text_with_header(chroma_client, row_description, row_metadata, str(idx))
+    # for idx, row in enumerate(doug_categories):
+    #     row_description = row['Description']
+    #     row_metadata = create_header_metadata(row)
+    #     store_text_with_header(chroma_client, row_description, row_metadata, str(idx))
 
-    categories_list = [d["Category"] for d in doug_categories]
-    sections = extract_sections(doc_location, categories_list)
-
-    for keyword, content_list in sections.items():
-        valid_keyword = make_valid_collection_name(keyword)
-        section_collection = chroma_client.get_or_create_collection(name=valid_keyword)
-        for i, content in enumerate(content_list):
-            section_collection.add(documents=[content], ids=str(i))
+    # for keyword, content_list in sections.items():
+    #     valid_keyword = make_valid_collection_name(keyword)
+    #     section_collection = chroma_client.get_or_create_collection(name=valid_keyword)
+    #     for i, content in enumerate(content_list):
+    #         section_collection.add(documents=[content], ids=str(i))
 
 
 def create_header_metadata(doug_row):
     return {
-        "category": doug_row['Category'],
+        "category": doug_row.metadata['Header 2'],
     }
 
 
