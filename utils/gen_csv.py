@@ -75,16 +75,17 @@ def get_headings_from(semantic_snippets):
         headings.append(s.metadata['heading'].replace('\n',''))
     return headings
 
-def save_titles_to_csv(titles, csv_path):
+def save_headings_to_csv(titles, csv_path):
     with open(csv_path, 'w', newline='', encoding='utf-8') as csv_file:
         writer = csv.writer(csv_file)
         writer.writerow(['Category', "Description"])  # Header
         writer.writerows([[title,title] for title in titles])
 
-if __name__ == "__main__":
-    pdf_path = "preload/Doug_Guide_to_the_Galaxy.pdf"
-    csv_path = "metadata/dougs_guide_categories.csv"
+def generate_csv(pdf_path="preload/Doug_Guide_to_the_Galaxy.pdf", csv_path="metadata/dougs_guide_categories.csv"):
     semantic_snippets =  load_and_parse_pdf(pdf_path)
     headings = get_headings_from(semantic_snippets)
-    save_titles_to_csv(headings, csv_path)
+    save_headings_to_csv(headings, csv_path)
     print(f"Titles extracted and saved to {csv_path}")
+
+if __name__ == "__main__":
+    generate_csv()
