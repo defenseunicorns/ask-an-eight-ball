@@ -20,7 +20,7 @@ class DocumentStore:
         self.username = "devopsdojoconsortium"
         self.repository = "dojoconsortium.org"
         self.path_to_directory = "content/en/docs"
-        self.url = f"https://api.github.com/repos/{self.username}/{self.repository}/contents/{self.path_to_directory}"
+        self.url = f"https://api.github.com/repos/{self.username}/{self.repository}/contents/"
 
         self.embedding_function = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
         self.chroma_db = Chroma(embedding_function=self.embedding_function, collection_name="default",

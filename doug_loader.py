@@ -1,3 +1,4 @@
+import base64
 import csv
 import ipaddress
 import json
@@ -10,6 +11,8 @@ import requests
 from langchain.text_splitter import (MarkdownHeaderTextSplitter,
                                      RecursiveCharacterTextSplitter)
 
+TOKEN = os.environ.get("TOKEN")
+HEADERS = {'Authorization': f'token {TOKEN}'}
 model = None
 
 from coda_ingester import extract_sections
@@ -72,33 +75,48 @@ def load_doug_data(chroma_client, csv_location, doc_location):
             section_collection.add(documents=[content], ids=str(i))
 
 
+def getHeader2(row):
+    try:
+        header_2_value = row.metadata.get("Header 2", "None")
+    except KeyError:
+        header_2_value = "None"
+    return header_2_value
+
+def get_files(url, path=''):
+   
+
+    response = requests.get(url + path, timeout=5, headers=HEADERS)
+
+    if response.status_code != 200:
+        print(f"HTTP error {response.status_code} when accessing {url + path}")
+        return []
+
+    data = response.json()
+
+    files = []
+    for file in data:
+        if file['type'] == 'dir':
+            files.extend(get_files(url, file['path']))
+        elif file['type'] == 'file' and file['name'].endswith('.md'):
+            files.append(file)
+    return files
+
+def read_file(file):
+    content = requests.get(file['download_url'], timeout=5, headers=HEADERS).content
+
+    return content
+
 def load_markdown_data(chroma_client, url):
 
     history_raw_text = ""
-    token = os.environ.get("TOKEN")
-    headers = {'Authorization': f'token {token}'}
 
-    response = requests.get(url, timeout=5, headers=headers)
+    files = get_files(url, "content/en/docs")
 
-
-    file_data = json.loads(response.text)
-
-    # Loop through the file_data to extract file URLs
-    for file_info in file_data:
-        if 'download_url' in file_info:
-            file_url = file_info['download_url']
-            file_name = file_info['name']
-            
-            # Check if the file has a .md or .markdown extension
-            if file_name.lower().endswith(('_index.md')):
-
-                # Make a GET request to fetch the file content
-                file_response = requests.get(file_url, timeout=5, headers=headers)
-
-                file_content = file_response.text
-                # Store the file content in the dictionary
-                #markdown_contents[file_name] = file_content
-                history_raw_text = history_raw_text + file_content
+    # response = requests.get(url, timeout=5, headers=headers)
+    for file in files:
+        # file_data = json.loads(read_file(file))
+        content = read_file(file)
+        history_raw_text = history_raw_text + content.decode('utf-8')
 
     headers_to_split_on = [
         ("#", "Header 1"),
@@ -116,16 +134,19 @@ def load_markdown_data(chroma_client, url):
 
     doug_categories=[]
     for idx, row in enumerate(docs):
-        if hasattr(row, 'page_content') and hasattr(row, 'metadata'):
-            metadata = row.metadata
-            print(f'{idx}  {row.metadata} {row.page_content} ')
+        metadata = row.metadata
+        # print(f'{idx}  {row.metadata} {row.page_content} ')
+
+
+        header_2_value = getHeader2(row)
             
-            # row_description=row.metadata['Header 2']
-            # row_metadata = create_header_metadata(row)
-            # store_text_with_header(chroma_client, row_description, row_metadata, str(idx))
-            # valid_keyword = make_valid_collection_name(row_description)
-            # section_collection = chroma_client.get_or_create_collection(name=valid_keyword)
-            # section_collection.add(documents=[row.page_content], ids=str(idx))
+            
+        row_description=header_2_value
+        row_metadata = create_header_metadata(row)
+        store_text_with_header(chroma_client, row_description, row_metadata, str(idx))
+        valid_keyword = make_valid_collection_name(row_description)
+        section_collection = chroma_client.get_or_create_collection(name=valid_keyword)
+        section_collection.add(documents=[row.page_content], ids=str(idx))
 
 
     #bdf
@@ -144,8 +165,9 @@ def load_markdown_data(chroma_client, url):
 
 
 def create_header_metadata(doug_row):
+
     return {
-        "category": doug_row.metadata['Header 2'],
+        "category": getHeader2(doug_row),
     }
 
 
