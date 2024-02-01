@@ -26,33 +26,42 @@ def load_csv_into_iterable_map(csv_file_path):
         return iterable_map_list
 
 
+def remove_trailing_non_alpha(s):
+    """
+    Remove any non-alpha character.
+    """
+    # The pattern r'[^\w\s]*$' matches any number of non-alphabetic characters at the end of the string
+    return re.sub(r'[^\w\s]*$', '', s)
+
 def make_valid_collection_name(s):
-    # Ensure the string starts and ends with an alphanumeric character
-    s = s.strip(".-_")
-
-    # Replace any series of invalid characters with a single underscore
-    s = re.sub(r'[^a-zA-Z0-9-_]+', '_', s)
-    s = re.sub(r'__+', '_', s)
-    s = re.sub(r'\.-|-\.', '-', s)
-    s = re.sub(r'\.\.', '.', s)
-
-    # Shorten the string if it's longer than 63 characters or lengthen if it's shorter than 3
-    if len(s) > 63:
-        s = s[:63]
-        s = s.strip(".-_")  # Ensure it still ends with an alphanumeric character
-    elif len(s) < 3:
-        s += '_' * (3 - len(s))
-
-    # Check if the string is a valid IPv4 address and modify it if necessary
+    # Check if the string is a valid IPv4 address
     try:
         ipaddress.IPv4Address(s)
-        # If it is a valid IPv4 address, add an underscore at the end to invalidate it
-        if len(s) < 63:
-            s += '_'
-        else:
-            s = '_' + s[1:]
+        # If it is, append an underscore to make it invalid
+        s += '_'
     except ipaddress.AddressValueError:
-        pass  # It is not a valid IPv4 address, so we're fine
+        # If it's not a valid IPv4 address, do nothing
+        pass
+
+    # Remove all characters that are not alphanumeric, underscore, or hyphen
+    s = re.sub(r'[^a-zA-Z0-9-_]+', '_', s)
+
+    # Replace any sequence of two or more periods with a single period
+    s = re.sub(r'\.\.+', '.', s)
+
+    # If the string is too short, append underscores
+    if len(s) < 3:
+        s += '_' * (3 - len(s))
+    # If the string is too long, truncate it
+    elif len(s) > 63:
+        s = s[:63]
+
+    # Ensure the string starts and ends with an alphanumeric character
+    s = s.strip(".-_")
+    if not s[0].isalnum():
+        s = 'z' + s[1:]
+    if not s[-1].isalnum():
+        s = s[:-1] + 'z'
 
     return s
 
