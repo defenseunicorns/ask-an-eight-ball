@@ -4,7 +4,7 @@ from langchain.embeddings.sentence_transformer import \
 from langchain.vectorstores import Chroma
 
 import ingest
-from doug_loader import load_markdown_data, query_with_doug
+from markdown_loader import load_markdown_data, query_with_doug
 
 
 class DocumentStore:
