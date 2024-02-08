@@ -1,17 +1,10 @@
 import csv
 import ipaddress
-import os
 import re
-import sys
 
 import outlines.models as models
 import outlines.text.generate as generate
-import requests
-from langchain.text_splitter import (MarkdownHeaderTextSplitter,
-                                     RecursiveCharacterTextSplitter)
 
-TOKEN = os.environ.get("TOKEN")
-HEADERS = {'Authorization': f'token {TOKEN}'}
 model = None
 
 from coda_ingester import extract_sections
@@ -25,44 +18,35 @@ def load_csv_into_iterable_map(csv_file_path):
         return iterable_map_list
 
 
-def remove_trailing_non_alpha(s):
-    """
-    Remove any non-alpha character.
-    """
-    # The pattern r'[^\w\s]*$' matches any number of non-alphabetic characters at the end of the string
-    return re.sub(r'[^\w\s]*$', '', s)
-
-def make_valid_collection_name(description):
-    # Check if the string is a valid IPv4 address
-    try:
-        ipaddress.IPv4Address(description)
-        # If it is, append an underscore to make it invalid
-        description += '_'
-    except ipaddress.AddressValueError:
-        # If it's not a valid IPv4 address, do nothing
-        pass
-
-    # Remove all characters that are not alphanumeric, underscore, or hyphen
-    description = re.sub(r'[^a-zA-Z0-9-_]+', '_', description)
-
-    # Replace any sequence of two or more periods with a single period
-    description = re.sub(r'\.\.+', '.', description)
-
-    # If the string is too short, append underscores
-    if len(description) < 3:
-        description += '_' * (3 - len(description))
-    # If the string is too long, truncate it
-    elif len(description) > 63:
-        description = description[:63]
-
+def make_valid_collection_name(s):
     # Ensure the string starts and ends with an alphanumeric character
-    description = description.strip(".-_")
-    if not description[0].isalnum():
-        description = 'z' + description[1:]
-    if not description[-1].isalnum():
-        description = description[:-1] + 'z'
+    s = s.strip(".-_")
 
-    return description
+    # Replace any series of invalid characters with a single underscore
+    s = re.sub(r'[^a-zA-Z0-9-_]+', '_', s)
+    s = re.sub(r'__+', '_', s)
+    s = re.sub(r'\.-|-\.', '-', s)
+    s = re.sub(r'\.\.', '.', s)
+
+    # Shorten the string if it's longer than 63 characters or lengthen if it's shorter than 3
+    if len(s) > 63:
+        s = s[:63]
+        s = s.strip(".-_")  # Ensure it still ends with an alphanumeric character
+    elif len(s) < 3:
+        s += '_' * (3 - len(s))
+
+    # Check if the string is a valid IPv4 address and modify it if necessary
+    try:
+        ipaddress.IPv4Address(s)
+        # If it is a valid IPv4 address, add an underscore at the end to invalidate it
+        if len(s) < 63:
+            s += '_'
+        else:
+            s = '_' + s[1:]
+    except ipaddress.AddressValueError:
+        pass  # It is not a valid IPv4 address, so we're fine
+
+    return s
 
 
 def load_doug_data(chroma_client, csv_location, doc_location):
@@ -83,107 +67,9 @@ def load_doug_data(chroma_client, csv_location, doc_location):
             section_collection.add(documents=[content], ids=str(i))
 
 
-
-def get_files(url, path=''):
-   
-
-    response = requests.get(url + path, timeout=5, headers=HEADERS)
-
-    if response.status_code != 200:
-        logger.error("HTTP error %s when accessing %s", response.status_code, url + path)
-        return []
-
-    data = response.json()
-
-    files = []
-    for file in data:
-        if file['type'] == 'dir':
-            files.extend(get_files(url, file['path']))
-        elif file['type'] == 'file' and file['name'].endswith('.md'):
-            files.append(file)
-    return files
-
-def read_file(file):
-    content = requests.get(file['download_url'], timeout=5, headers=HEADERS).content
-
-    return content
-
-def create_description(metadata):
-    return '_'.join(metadata.values())
-
-def load_markdown_data(chroma_client, url):
-
-    history_raw_text = ""
-
-    files = get_files(url, "content/en/docs")
-
-    # response = requests.get(url, timeout=5, headers=headers)
-    for file in files:
-        # file_data = json.loads(read_file(file))
-        content = read_file(file)
-        history_raw_text = history_raw_text + content.decode('utf-8')
-
-    headers_to_split_on = [
-        ("#", "Header 1"),
-        ("##", "Header 2"),
-        ("###", "Header 3"),
-        ("####", "Header 4"),
-    ]
-
-    md_splitter = MarkdownHeaderTextSplitter(headers_to_split_on=headers_to_split_on)
-
-    data = md_splitter.split_text(history_raw_text)
-
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=150)
-    docs = text_splitter.split_documents(data)
-
-    for idx, row in enumerate(docs):
-        metadata = row.metadata
-        if not metadata:
-            title = re.search(r'\ntitle: (.*?)\n', row.page_content).group(1)
-            if title:
-                metadata = {"Header 1":title}
-            else:
-                metadata = {"Header 1":"None"}
-    
-        row_number = str(idx)
-            
-        row_description=create_description(metadata)
-        valid_keyword = make_valid_collection_name(row_description)
-
-
-        print("Row:", row_number, "Title:", row_description, "Index:", valid_keyword)
-
-        # print("Page Content:",chunk.page_content,"\n")
-        # print("Character Count:",len(str(chunk)),"\n")
-        # print("Token Count:",len(str(chunk).split()),"\n")
-        # print("Metadata:",str(chunk.metadata),"\n"
-
-
-        store_text_with_header(chroma_client, row_description, metadata, row_number)
-        section_collection = chroma_client.get_or_create_collection(name=valid_keyword)
-        section_collection.add(documents=[row.page_content], ids=str(idx))
-
-
-    #bdf
-    # doug_categories = load_csv_into_iterable_map(csv_location)
-
-    # for idx, row in enumerate(doug_categories):
-    #     row_description = row['Description']
-    #     row_metadata = create_header_metadata(row)
-    #     store_text_with_header(chroma_client, row_description, row_metadata, str(idx))
-
-    # for keyword, content_list in sections.items():
-    #     valid_keyword = make_valid_collection_name(keyword)
-    #     section_collection = chroma_client.get_or_create_collection(name=valid_keyword)
-    #     for i, content in enumerate(content_list):
-    #         section_collection.add(documents=[content], ids=str(i))
-
-
 def create_header_metadata(doug_row):
-
     return {
-        "category": getHeader2(doug_row),
+        "category": doug_row['Category'],
     }
 
 
@@ -203,7 +89,7 @@ def find_most_similar(input_string, string_list):
     result = generate.choice(model=model, choices=string_list)(
         f"Which one of these items is most relevant to this question: {input_string}")
     print(result)
-    return result
+    return
 
 
 def query_with_doug(chroma_client, text, generative=False):

@@ -1,8 +1,6 @@
-import csv
 import ipaddress
 import os
 import re
-import sys
 
 import outlines.models as models
 import outlines.text.generate as generate
@@ -14,23 +12,6 @@ TOKEN = os.environ.get("TOKEN")
 HEADERS = {'Authorization': f'token {TOKEN}'}
 model = None
 
-from coda_ingester import extract_sections
-
-
-def load_csv_into_iterable_map(csv_file_path):
-    with open(csv_file_path, "r", encoding="utf-8") as csv_file:
-        dict_reader = csv.DictReader(csv_file)
-        iterable_map = map(lambda row: {key: row[key] for key in row.keys()}, dict_reader)
-        iterable_map_list = list(iterable_map)
-        return iterable_map_list
-
-
-def remove_trailing_non_alpha(s):
-    """
-    Remove any non-alpha character.
-    """
-    # The pattern r'[^\w\s]*$' matches any number of non-alphabetic characters at the end of the string
-    return re.sub(r'[^\w\s]*$', '', s)
 
 def make_valid_collection_name(description):
     # Check if the string is a valid IPv4 address
@@ -65,32 +46,13 @@ def make_valid_collection_name(description):
     return description
 
 
-def load_doug_data(chroma_client, csv_location, doc_location):
-    doug_categories = load_csv_into_iterable_map(csv_location)
-
-    for idx, row in enumerate(doug_categories):
-        row_metadata = create_header_metadata(row)
-        row_description = row['Description']
-        store_text_with_header(chroma_client, row_description, row_metadata, str(idx))
-
-    categories_list = [d["Category"] for d in doug_categories]
-    sections = extract_sections(doc_location, categories_list)
-
-    for keyword, content_list in sections.items():
-        valid_keyword = make_valid_collection_name(keyword)
-        section_collection = chroma_client.get_or_create_collection(name=valid_keyword)
-        for i, content in enumerate(content_list):
-            section_collection.add(documents=[content], ids=str(i))
-
-
-
-def get_files(url, path=''):
+def fetch_markdown(url, path=''):
    
 
     response = requests.get(url + path, timeout=5, headers=HEADERS)
 
     if response.status_code != 200:
-        logger.error("HTTP error %s when accessing %s", response.status_code, url + path)
+        print(f"ERROR: HTTP error {response.status_code} when accessing {url + path}")
         return []
 
     data = response.json()
@@ -98,7 +60,7 @@ def get_files(url, path=''):
     files = []
     for file in data:
         if file['type'] == 'dir':
-            files.extend(get_files(url, file['path']))
+            files.extend(fetch_markdown(url, file['path']))
         elif file['type'] == 'file' and file['name'].endswith('.md'):
             files.append(file)
     return files
@@ -115,11 +77,9 @@ def load_markdown_data(chroma_client, url):
 
     history_raw_text = ""
 
-    files = get_files(url, "content/en/docs")
+    files = fetch_markdown(url, "content/en/docs")
 
-    # response = requests.get(url, timeout=5, headers=headers)
     for file in files:
-        # file_data = json.loads(read_file(file))
         content = read_file(file)
         history_raw_text = history_raw_text + content.decode('utf-8')
 
@@ -154,38 +114,10 @@ def load_markdown_data(chroma_client, url):
 
         print("Row:", row_number, "Title:", row_description, "Index:", valid_keyword)
 
-        # print("Page Content:",chunk.page_content,"\n")
-        # print("Character Count:",len(str(chunk)),"\n")
-        # print("Token Count:",len(str(chunk).split()),"\n")
-        # print("Metadata:",str(chunk.metadata),"\n"
-
 
         store_text_with_header(chroma_client, row_description, metadata, row_number)
         section_collection = chroma_client.get_or_create_collection(name=valid_keyword)
         section_collection.add(documents=[row.page_content], ids=str(idx))
-
-
-    #bdf
-    # doug_categories = load_csv_into_iterable_map(csv_location)
-
-    # for idx, row in enumerate(doug_categories):
-    #     row_description = row['Description']
-    #     row_metadata = create_header_metadata(row)
-    #     store_text_with_header(chroma_client, row_description, row_metadata, str(idx))
-
-    # for keyword, content_list in sections.items():
-    #     valid_keyword = make_valid_collection_name(keyword)
-    #     section_collection = chroma_client.get_or_create_collection(name=valid_keyword)
-    #     for i, content in enumerate(content_list):
-    #         section_collection.add(documents=[content], ids=str(i))
-
-
-def create_header_metadata(doug_row):
-
-    return {
-        "category": getHeader2(doug_row),
-    }
-
 
 def store_text_with_header(chroma_client, text, header_metadata, doc_id):
     category_collection = chroma_client.get_or_create_collection(name="categories")
@@ -198,13 +130,11 @@ def store_text_with_header(chroma_client, text, header_metadata, doc_id):
 
     return chroma_id
 
-
 def find_most_similar(input_string, string_list):
     result = generate.choice(model=model, choices=string_list)(
         f"Which one of these items is most relevant to this question: {input_string}")
     print(result)
     return result
-
 
 def query_with_doug(chroma_client, text, generative=False):
     global model
