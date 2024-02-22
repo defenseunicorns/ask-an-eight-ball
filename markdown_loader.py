@@ -8,7 +8,11 @@ import requests
 from langchain.text_splitter import (MarkdownHeaderTextSplitter,
                                      RecursiveCharacterTextSplitter)
 
+import coda_exporter
+
 GH_PA_TOKEN = os.environ.get("GH_PA_TOKEN")
+CODA_API = os.environ.get("CODA_API")
+
 HEADERS = {'Authorization': f'token {GH_PA_TOKEN}'}
 model = None
 
@@ -85,6 +89,12 @@ def load_markdown_data(chroma_client, url):
         content = read_file(file)
         history_raw_text = history_raw_text + content.decode('utf-8')
 
+    coda_docs = coda_exporter.get_coda_docs(CODA_API)
+    coda_content_list = [obj['content'] for obj in coda_docs if 'content' in obj]
+
+    for coda_doc in coda_content_list:
+        history_raw_text = history_raw_text + coda_doc
+
     headers_to_split_on = [
         ("#", "Header 1"),
         ("##", "Header 2"),
@@ -112,9 +122,6 @@ def load_markdown_data(chroma_client, url):
             
         row_description=create_description(metadata)
         valid_keyword = make_valid_collection_name(row_description)
-
-
-        print("Row:", row_number, "Title:", row_description, "Index:", valid_keyword)
 
 
         store_text_with_header(chroma_client, row_description, metadata, row_number)
