@@ -48,10 +48,6 @@ class DocumentStore:
     def load_pdf(self, path):
         self.ingestor.load_data(path)
 
-    # def load_doug_date(self):
-    #     load_doug_data(self.client, "metadata/dougs_guide_categories.csv", "preload/Doug_Guide_to_the_Galaxy.pdf")
-
-
 
     def load_doug_date(self):
         load_markdown_data(self.client, self.url)

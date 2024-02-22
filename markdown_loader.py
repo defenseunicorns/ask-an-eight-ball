@@ -8,10 +8,12 @@ import requests
 from langchain.text_splitter import (MarkdownHeaderTextSplitter,
                                      RecursiveCharacterTextSplitter)
 
-TOKEN = os.environ.get("TOKEN")
-HEADERS = {'Authorization': f'token {TOKEN}'}
+GH_PA_TOKEN = os.environ.get("GH_PA_TOKEN")
+HEADERS = {'Authorization': f'token {GH_PA_TOKEN}'}
 model = None
 
+CHUNK_SIZE=2000
+CHUNK_OVERLAP=150
 
 def make_valid_collection_name(description):
     # Check if the string is a valid IPv4 address
@@ -94,7 +96,7 @@ def load_markdown_data(chroma_client, url):
 
     data = md_splitter.split_text(history_raw_text)
 
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=150)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)
     docs = text_splitter.split_documents(data)
 
     for idx, row in enumerate(docs):
