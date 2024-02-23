@@ -170,8 +170,11 @@ def query_with_doug(chroma_client, text, generative=False):
     else:
         print(chroma_client.list_collections())
         collection = chroma_client.get_collection(name="categories")
+        print(f"query_texts=[{text}]")
+        print(f"PEEk: {collection.peek()}")
+
         results = collection.query(query_texts=[text], n_results=1)
-        print(results)
+        print(f"RESULTS: {results}")
         category = results["metadatas"][0][0]['category']
 
     valid_category = make_valid_collection_name(category)
