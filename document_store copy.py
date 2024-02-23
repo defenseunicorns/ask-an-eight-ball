@@ -6,23 +6,34 @@ from langchain.vectorstores import Chroma
 import ingest
 from markdown_loader import load_markdown_data, query_with_doug
 
+GH_USER = "defenseunicorns"
+GH_REPO = "zarf"
+PATH = 'docs'
+
 
 class DocumentStore:
     def __init__(self):
         self.index_name = "default"
         self.client = chromadb.PersistentClient(path="db")
         self.collection = self.client.get_or_create_collection(name="default")
-        self.ingestor = ingest.Ingest(self.index_name, self.client, self.collection)
+        self.ingestor = ingest.Ingest(
+            self.index_name, self.client, self.collection)
         # For the sliding window
         self.chunk_size = 200
         self.overlap_size = 50
 
         self.username = "devopsdojoconsortium"
         self.repository = "dojoconsortium.org"
-        self.path_to_directory = "content/en/docs"
+        self.path = "content/en/docs"
+
+        # self.username = GH_USER
+        # self.repository = GH_REPO
+        # self.path = PATH
+
         self.url = f"https://api.github.com/repos/{self.username}/{self.repository}/contents/"
 
-        self.embedding_function = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
+        self.embedding_function = SentenceTransformerEmbeddings(
+            model_name="all-MiniLM-L6-v2")
         self.chroma_db = Chroma(embedding_function=self.embedding_function, collection_name="default",
                                 client=self.client)
 
@@ -48,6 +59,5 @@ class DocumentStore:
     def load_pdf(self, path):
         self.ingestor.load_data(path)
 
-
-    def load_doug_date(self):
-        load_markdown_data(self.client, self.url)
+    def load_doug_data(self):
+        load_markdown_data(self.client, self.url, self.path)
