@@ -4,5 +4,5 @@ QUESTION=$1
 
 INPUT="{\"input\":\"${QUESTION}\",\"collection_name\":\"default\" }"
 echo 
-curl --header "Content-Type: application/json" -d "${INPUT}" localhost:8002/query/ | jq .results
+curl --header "Content-Type: application/json" -d "${INPUT}" localhost:8002/query/ 
 
