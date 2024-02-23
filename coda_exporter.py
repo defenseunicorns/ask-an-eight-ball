@@ -15,7 +15,7 @@ def list_all_documents(api_token):
     headers = {"Authorization": f"Bearer {api_token}"}
     
     try:
-        response = requests.get(url, headers=headers)
+        response = requests.get(url, headers=headers, timeout=5)
         response.raise_for_status()  # Raises HTTPError for bad responses
         
         # Extract document info from the response
@@ -36,8 +36,8 @@ def start_export(doc_id, name, api_token):
     headers = {"Authorization": f"Bearer {api_token}"}
     payload = {"outputFormat": "markdown"}
     
-    response = requests.post(url, json=payload, headers=headers)
-    if response.status_code == 200:
+    response = requests.post(url, json=payload, headers=headers, timeout=5)
+    if response.status_code == 202:
         return response.json().get("id")  # Return the markdown.id
     else:
         print(f"Error starting export for doc {doc_id}, page {name}: {response.text}")
@@ -51,7 +51,7 @@ def poll_export_status(doc_id, name, request_id, api_token):
     headers = {"Authorization": f"Bearer {api_token}"}
     
     while True:
-        response = requests.get(url, headers=headers)
+        response = requests.get(url, headers=headers, timeout=5)
         if response.status_code == 200:
             status_data = response.json()
             if status_data.get("status") == "complete":
@@ -68,7 +68,7 @@ def download_exported_file(download_link):
     """
     Downloads the exported markdown content from the given download link.
     """
-    response = requests.get(download_link)
+    response = requests.get(download_link, timeout=5)
     if response.status_code == 200:
         return response.text
     else:
@@ -96,6 +96,7 @@ def export_documents_as_markdown(documents, api_token):
 
 def get_coda_docs(api_token):
     documents = list_all_documents(api_token)
+    print(f"DOCS: {documents}")
     results = export_documents_as_markdown(documents, api_token)
 
     print(results)

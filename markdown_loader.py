@@ -8,7 +8,7 @@ import requests
 from langchain.text_splitter import (MarkdownHeaderTextSplitter,
                                      RecursiveCharacterTextSplitter)
 
-import coda_exporter
+import coda_exporter as coda
 
 GH_PA_TOKEN = os.environ.get("GH_PA_TOKEN")
 CODA_API = os.environ.get("CODA_API")
@@ -89,7 +89,9 @@ def load_markdown_data(chroma_client, url):
         content = read_file(file)
         history_raw_text = history_raw_text + content.decode('utf-8')
 
-    coda_docs = coda_exporter.get_coda_docs(CODA_API)
+    coda_docs = coda.get_coda_docs(CODA_API)
+    print(coda_docs)
+    exit()
     coda_content_list = [obj['content'] for obj in coda_docs if 'content' in obj]
 
     for coda_doc in coda_content_list:

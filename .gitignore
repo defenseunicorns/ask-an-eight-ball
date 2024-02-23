@@ -6,4 +6,4 @@ metadata/*
 __pycache__/
 db/
 .env
-log.txt
+*.log
