@@ -77,7 +77,31 @@ def read_file(file):
 
 
 def create_description(metadata):
+    print(metadata)
     return '_'.join(metadata.values())
+
+
+def extract_title_from_hugo_frontmatter(markdown_content):
+    """
+    Extracts the title property from the Hugo frontmatter in a markdown document.
+
+    """
+
+    frontmatter_pattern = r'^---\s+(.*?)\s+---'
+    frontmatter_match = re.search(
+        frontmatter_pattern, markdown_content, re.DOTALL | re.MULTILINE)
+    if not frontmatter_match:
+        return ""  # No frontmatter found
+
+    # If frontmatter is found, search for the title property within it
+    frontmatter_content = frontmatter_match.group(1)
+    title_pattern = r'^title:\s*(.*?)\s*(?:\n|$)'
+    title_match = re.search(title_pattern, frontmatter_content, re.MULTILINE)
+    if title_match:
+        # Return the captured title, stripping quotes if present
+        return title_match.group(1).strip('"').strip("'")
+    else:
+        return ""
 
 
 def load_markdown_data(chroma_client, url):
@@ -108,17 +132,23 @@ def load_markdown_data(chroma_client, url):
 
     for idx, row in enumerate(docs):
         metadata = row.metadata
-        if not metadata:
-            title = re.search(r'\ntitle: (.*?)\n', row.page_content).group(1)
-            if title:
-                metadata = {"Header 1": title}
-            else:
-                metadata = {"Header 1": "None"}
+
+        h1 = ""
+        if "Header 1" not in metadata:
+            h1 = {"Header 1": extract_title_from_hugo_frontmatter(
+                row.page_content)}
+            metadata = {**h1, **metadata}
 
         row_number = str(idx)
 
         row_description = create_description(metadata)
         valid_keyword = make_valid_collection_name(row_description)
+
+        category = ""
+        for value in metadata.values():
+            category = category + " " + (value if value is not None else "")
+
+        metadata["category"] = category
 
         store_text_with_header(
             chroma_client, row_description, metadata, row_number)
@@ -168,13 +198,9 @@ def query_with_doug(chroma_client, text, generative=False):
                 category = d["Category"]
     # Use similarity search using an embedding model like "sentence-transformers/all-MiniLM-L6-v2"
     else:
-        print(chroma_client.list_collections())
         collection = chroma_client.get_collection(name="categories")
-        print(f"query_texts=[{text}]")
-        print(f"PEEk: {collection.peek()}")
 
         results = collection.query(query_texts=[text], n_results=1)
-        print(f"RESULTS: {results}")
         category = results["metadatas"][0][0]['category']
 
     valid_category = make_valid_collection_name(category)
