@@ -3,7 +3,7 @@ attrs==19.3.0
 requests~=2.31.0
 python-dateutil~=2.8.2
 uvicorn~=0.24.0.post1
-fastapi~=0.104.1
+fastapi~=0.109.2
 pydantic~=2.4.2
 langchain~=0.0.330
 outlines~=0.0.9
