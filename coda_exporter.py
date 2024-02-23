@@ -4,6 +4,8 @@ import requests
 
 POLLING_DELAY = 1
 RATE_LIMIT_DELAY = 1
+HTTP_TIMEOUT = 5
+MAX_DOCS = 3
 
 
 def list_all_documents(api_token):
@@ -18,13 +20,16 @@ def list_all_documents(api_token):
     headers = {"Authorization": f"Bearer {api_token}"}
 
     try:
-        response = requests.get(url, headers=headers, timeout=5)
+        response = requests.get(url, headers=headers, timeout=HTTP_TIMEOUT)
         response.raise_for_status()  # Raises HTTPError for bad responses
 
         # Extract document info from the response
         documents = response.json().get('items', [])
         doc_ids = [doc['id'] for doc in documents]
         results = []
+
+        limited_list = doc_ids[:MAX_DOCS]  # TODO: Remove limit
+        doc_ids = limited_list
 
         # Iterate over each doc_id
         for doc_id in doc_ids:
@@ -37,6 +42,7 @@ def list_all_documents(api_token):
                 # Append the pair object to the result list
                 results.append(pair)
 
+        print(f"Found {len(results)} documents")
         return results
     except requests.RequestException as e:
         print(f"Error fetching documents from Coda: {e}")
@@ -55,12 +61,14 @@ def list_all_pages_for_doc(api_token, doc_id):
     headers = {"Authorization": f"Bearer {api_token}"}
 
     try:
-        response = requests.get(url, headers=headers, timeout=5)
+        response = requests.get(url, headers=headers, timeout=HTTP_TIMEOUT)
         response.raise_for_status()  # Raises HTTPError for bad responses
 
         # Extract document info from the response
         pages = response.json().get('items', [])
         page_info = [page['id'] for page in pages]
+
+        print(f"Found {len(pages)} pages for document {doc_id}")
 
         return page_info
     except requests.RequestException as e:
@@ -76,7 +84,8 @@ def start_export(doc_id, page_id, api_token):
     headers = {"Authorization": f"Bearer {api_token}"}
     payload = {"outputFormat": "markdown"}
 
-    response = requests.post(url, json=payload, headers=headers, timeout=5)
+    response = requests.post(
+        url, json=payload, headers=headers, timeout=HTTP_TIMEOUT)
     if response.status_code == 202:
         return response.json().get("id")
     else:
@@ -95,7 +104,7 @@ def poll_export_status(doc_id, page_id, request_id, api_token):
 
     while True:
         time.sleep(POLLING_DELAY)
-        response = requests.get(url, headers=headers, timeout=5)
+        response = requests.get(url, headers=headers, timeout=HTTP_TIMEOUT)
         if response.status_code == 200:
             status_data = response.json()
             print(f"polling export for doc:{doc_id}, request:{request_id}")
@@ -117,7 +126,7 @@ def download_exported_file(download_link):
     """
     Downloads the exported markdown content from the given download link.
     """
-    response = requests.get(download_link, timeout=5)
+    response = requests.get(download_link, timeout=HTTP_TIMEOUT)
     if response.status_code == 200:
         return response.text
     else:
@@ -133,14 +142,15 @@ def export_documents_as_markdown(documents, api_token):
     results = []
 
     for doc in documents:
-        time.sleep(1)  # Polling interval
+        # time.sleep(1)  # Polling interval
 
-        print(f"start_export({doc['doc_id']}, {doc['page_id']}")
         request_id = start_export(doc['doc_id'], doc['page_id'], api_token)
         if request_id:
             download_link = poll_export_status(
                 doc['doc_id'], doc['page_id'], request_id, api_token)
             if download_link:
+                print(
+                    f"Downloading file for doc:{doc['doc_id']} page:{doc['page_id']} ")
                 content = download_exported_file(download_link)
                 results.append(content)
 
@@ -150,7 +160,5 @@ def export_documents_as_markdown(documents, api_token):
 def get_coda_docs(api_token):
     documents = list_all_documents(api_token)
     results = export_documents_as_markdown(documents, api_token)
-
-    print(results)
 
     return results

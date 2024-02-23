@@ -12,7 +12,8 @@ class DocumentStore:
         self.index_name = "default"
         self.client = chromadb.PersistentClient(path="db")
         self.collection = self.client.get_or_create_collection(name="default")
-        self.ingestor = ingest.Ingest(self.index_name, self.client, self.collection)
+        self.ingestor = ingest.Ingest(
+            self.index_name, self.client, self.collection)
         # For the sliding window
         self.chunk_size = 200
         self.overlap_size = 50
@@ -22,7 +23,8 @@ class DocumentStore:
         self.path_to_directory = "content/en/docs"
         self.url = f"https://api.github.com/repos/{self.username}/{self.repository}/contents/"
 
-        self.embedding_function = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
+        self.embedding_function = SentenceTransformerEmbeddings(
+            model_name="all-MiniLM-L6-v2")
         self.chroma_db = Chroma(embedding_function=self.embedding_function, collection_name="default",
                                 client=self.client)
 
@@ -42,12 +44,11 @@ class DocumentStore:
         return docs
 
     def query_with_doug(self, query_text):
-        result = query_with_doug(self.client, query_text)
+        result = query_with_doug(self.client, query_text, True)
         return result['documents'][0][0]
 
     def load_pdf(self, path):
         self.ingestor.load_data(path)
-
 
     def load_doug_date(self):
         load_markdown_data(self.client, self.url)

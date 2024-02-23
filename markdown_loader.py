@@ -19,6 +19,8 @@ model = None
 CHUNK_SIZE = 2000
 CHUNK_OVERLAP = 150
 
+descriptions = []
+
 
 def make_valid_collection_name(description):
     # Check if the string is a valid IPv4 address
@@ -84,23 +86,44 @@ def create_description(metadata):
     return "_".join(metadata.values())
 
 
-def load_markdown_data(chroma_client, url):
+def summarize_page_content(page_content):
+    """
+    Summarizes the page content to a maximum of 220 characters, preferring to break on whitespace.
 
+    Args:
+    - page_content (str): The content of the page as a string.
+
+    Returns:
+    - str: A summary of the page content.
+    """
+    initial_slice = page_content[:220]
+
+    last_space = initial_slice.rfind(' ')
+
+    if last_space == -1 or last_space > 200:
+        summary = page_content[:200]
+    else:
+        summary = initial_slice[:last_space]
+
+    return summary
+
+
+def load_markdown_data(chroma_client, url):
+    global descriptions
     history_raw_text = ""
+
+    descriptions = []
 
     files = fetch_markdown(url, "content/en/docs")
 
     for file in files:
         content = read_file(file)
         history_raw_text = history_raw_text + content.decode("utf-8")
+    print(content)
 
     coda_docs = coda.get_coda_docs(CODA_API)
-    print(coda_docs)
-    exit()
-    coda_content_list = [obj["content"]
-                         for obj in coda_docs if "content" in obj]
 
-    for coda_doc in coda_content_list:
+    for coda_doc in coda_docs:
         history_raw_text = history_raw_text + coda_doc
 
     headers_to_split_on = [
@@ -134,6 +157,9 @@ def load_markdown_data(chroma_client, url):
         row_description = create_description(metadata)
         valid_keyword = make_valid_collection_name(row_description)
 
+        descriptions.append({'category': row_description,
+                            'description': summarize_page_content(row.page_content)})
+
         store_text_with_header(
             chroma_client, row_description, metadata, row_number)
         section_collection = chroma_client.get_or_create_collection(
@@ -145,12 +171,12 @@ def store_text_with_header(chroma_client, text, header_metadata, doc_id):
     category_collection = chroma_client.get_or_create_collection(
         name="categories")
 
-    descriptions = [text]
+    desc = [text]
     header_metadatas = [header_metadata]
     doc_ids = [doc_id]
 
     chroma_id = category_collection.add(
-        documents=descriptions, metadatas=header_metadatas, ids=doc_ids
+        documents=desc, metadatas=header_metadatas, ids=doc_ids
     )
 
     return chroma_id
@@ -164,6 +190,10 @@ def find_most_similar(input_string, string_list):
     return result
 
 
+def create_desc_list(desc):
+    return list(desc)
+
+
 def query_with_doug(chroma_client, text, generative=False):
     global model
     category = ""
@@ -175,16 +205,13 @@ def query_with_doug(chroma_client, text, generative=False):
                 "TheBloke/SynthIA-7B-v2.0-GPTQ", device="cuda:0"
             )
 
-        doug_categories = load_csv_into_iterable_map(
-            "metadata/dougs_guide_categories.csv"
-        )
-        descriptions = [d["Description"] for d in doug_categories]
+        categories = create_desc_list(descriptions)
+
         description = find_most_similar(text, descriptions)
 
-        for d in doug_categories:
-
-            if d["Description"] == description:
-                category = d["Category"]
+        for category in categories:
+            if category["description"] == description:
+                category = category["category"]
     # Use similarity search using an embedding model like "sentence-transformers/all-MiniLM-L6-v2"
     else:
         collection = chroma_client.get_collection(name="categories")
