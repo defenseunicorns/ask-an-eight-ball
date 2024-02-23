@@ -12,8 +12,9 @@ GH_PA_TOKEN = os.environ.get("GH_PA_TOKEN")
 HEADERS = {'Authorization': f'token {GH_PA_TOKEN}'}
 model = None
 
-CHUNK_SIZE=2000
-CHUNK_OVERLAP=150
+CHUNK_SIZE = 2000
+CHUNK_OVERLAP = 150
+
 
 def make_valid_collection_name(description):
     # Check if the string is a valid IPv4 address
@@ -49,12 +50,12 @@ def make_valid_collection_name(description):
 
 
 def fetch_markdown(url, path=''):
-   
 
     response = requests.get(url + path, timeout=5, headers=HEADERS)
 
     if response.status_code != 200:
-        print(f"ERROR: HTTP error {response.status_code} when accessing {url + path}")
+        print(
+            f"ERROR: HTTP error {response.status_code} when accessing {url + path}")
         return []
 
     data = response.json()
@@ -67,13 +68,17 @@ def fetch_markdown(url, path=''):
             files.append(file)
     return files
 
+
 def read_file(file):
-    content = requests.get(file['download_url'], timeout=5, headers=HEADERS).content
+    content = requests.get(file['download_url'],
+                           timeout=5, headers=HEADERS).content
 
     return content
 
+
 def create_description(metadata):
     return '_'.join(metadata.values())
+
 
 def load_markdown_data(chroma_client, url):
 
@@ -92,11 +97,13 @@ def load_markdown_data(chroma_client, url):
         ("####", "Header 4"),
     ]
 
-    md_splitter = MarkdownHeaderTextSplitter(headers_to_split_on=headers_to_split_on)
+    md_splitter = MarkdownHeaderTextSplitter(
+        headers_to_split_on=headers_to_split_on)
 
     data = md_splitter.split_text(history_raw_text)
 
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)
     docs = text_splitter.split_documents(data)
 
     for idx, row in enumerate(docs):
@@ -104,39 +111,41 @@ def load_markdown_data(chroma_client, url):
         if not metadata:
             title = re.search(r'\ntitle: (.*?)\n', row.page_content).group(1)
             if title:
-                metadata = {"Header 1":title}
+                metadata = {"Header 1": title}
             else:
-                metadata = {"Header 1":"None"}
-    
+                metadata = {"Header 1": "None"}
+
         row_number = str(idx)
-            
-        row_description=create_description(metadata)
+
+        row_description = create_description(metadata)
         valid_keyword = make_valid_collection_name(row_description)
 
-
-        print("Row:", row_number, "Title:", row_description, "Index:", valid_keyword)
-
-
-        store_text_with_header(chroma_client, row_description, metadata, row_number)
-        section_collection = chroma_client.get_or_create_collection(name=valid_keyword)
+        store_text_with_header(
+            chroma_client, row_description, metadata, row_number)
+        section_collection = chroma_client.get_or_create_collection(
+            name=valid_keyword)
         section_collection.add(documents=[row.page_content], ids=str(idx))
 
+
 def store_text_with_header(chroma_client, text, header_metadata, doc_id):
-    category_collection = chroma_client.get_or_create_collection(name="categories")
+    category_collection = chroma_client.get_or_create_collection(
+        name="categories")
 
     descriptions = [text]
     header_metadatas = [header_metadata]
     doc_ids = [doc_id]
 
-    chroma_id = category_collection.add(documents=descriptions, metadatas=header_metadatas, ids=doc_ids)
+    chroma_id = category_collection.add(
+        documents=descriptions, metadatas=header_metadatas, ids=doc_ids)
 
     return chroma_id
+
 
 def find_most_similar(input_string, string_list):
     result = generate.choice(model=model, choices=string_list)(
         f"Which one of these items is most relevant to this question: {input_string}")
-    print(result)
     return result
+
 
 def query_with_doug(chroma_client, text, generative=False):
     global model
@@ -145,9 +154,11 @@ def query_with_doug(chroma_client, text, generative=False):
     # Use a generative model like Synthia-7b
     if generative:
         if model is None:
-            model = models.transformers("TheBloke/SynthIA-7B-v2.0-GPTQ", device="cuda:0")
+            model = models.transformers(
+                "TheBloke/SynthIA-7B-v2.0-GPTQ", device="cuda:0")
 
-        doug_categories = load_csv_into_iterable_map("metadata/dougs_guide_categories.csv")
+        doug_categories = load_csv_into_iterable_map(
+            "metadata/dougs_guide_categories.csv")
         descriptions = [d["Description"] for d in doug_categories]
         description = find_most_similar(text, descriptions)
 
@@ -157,8 +168,10 @@ def query_with_doug(chroma_client, text, generative=False):
                 category = d["Category"]
     # Use similarity search using an embedding model like "sentence-transformers/all-MiniLM-L6-v2"
     else:
+        print(chroma_client.list_collections())
         collection = chroma_client.get_collection(name="categories")
         results = collection.query(query_texts=[text], n_results=1)
+        print(results)
         category = results["metadatas"][0][0]['category']
 
     valid_category = make_valid_collection_name(category)
