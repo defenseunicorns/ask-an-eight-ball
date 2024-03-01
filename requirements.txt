@@ -1,7 +1,7 @@
 chromadb~=0.4.15
 attrs==23.2.0
 requests~=2.31.0
-python-dateutil~=2.8.2
+python-dateutil~=2.9.0.post0
 uvicorn~=0.24.0.post1
 fastapi~=0.109.2
 pydantic~=2.4.2
