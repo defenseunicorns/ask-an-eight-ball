@@ -11,4 +11,4 @@ transformers~=4.35.0
 pymupdf~=1.23.5
 codaio~=0.6.10
 datasets~=2.17.1
-sentence-transformers~=2.2.2
+sentence-transformers~=2.6.1
